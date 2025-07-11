@@ -1,0 +1,123 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "EmailTrigger",
+      "name": "Leer Email (Gmail)",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $json.text || $json.textPlain || '';\nconst telefono = body.match(/(?:\\+?\\d{2})?\\s?\\(?\\d{2,3}\\)?[\\s.-]?\\d{4,5}[\\s.-]?\\d{4}/);\nconst nombre = body.match(/Nombre: (.+)/i);\nconst email = $json.from || '';\nreturn [{\n  telefono: telefono ? telefono[0].replace(/\\D/g, '') : '',\n  nombre: nombre ? nombre[1].trim() : 'Cliente',\n  email: email\n}];"
+      },
+      "id": "ExtraerDatos",
+      "name": "Extraer Datos del Email",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "emailAddressesUi": {
+          "emailAddressesValues": [
+            {
+              "label": "trabajo",
+              "email": "={{ $json.email }}"
+            }
+          ]
+        },
+        "phoneNumbersUi": {
+          "phoneNumbersValues": [
+            {
+              "label": "celular",
+              "number": "={{ '+' + $json.telefono }}"
+            }
+          ]
+        },
+        "namesUi": {
+          "namesValues": [
+            {
+              "givenName": "={{ $json.nombre }}"
+            }
+          ]
+        }
+      },
+      "id": "CrearContactoGoogle",
+      "name": "Crear Lead en Google Contacts",
+      "type": "n8n-nodes-base.googleContacts",
+      "typeVersion": 1,
+      "position": [500, 300],
+      "credentials": {
+        "googleContactsOAuth2Api": {
+          "id": "GOOGLE_CREDENTIAL_ID",
+          "name": "Google OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v18.0/732202826640780/messages",
+        "method": "POST",
+        "authentication": "none",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"+{{ $json.telefono }}\",\n  \"type\": \"template\",\n  \"template\": {\n    \"name\": \"hello_world\",\n    \"language\": {\n      \"code\": \"es\"\n    },\n    \"components\": [\n      {\n        \"type\": \"body\",\n        \"parameters\": [\n          { \"type\": \"text\", \"text\": \"{{ $json.nombre }}\" }\n        ]\n      }\n    ]\n  }\n}"
+      },
+      "id": "EnviarWhatsApp",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "WHATSAPP_META_TOKEN",
+          "name": "Meta WhatsApp Token",
+          "data": {
+            "headers": {
+              "Authorization": "Bearer EAAU8PkjZBUsABPLEEZAf1HFQMZBKDLLI6PLLYsyl68XPaXZC80mCcaeAoKXtDfx0FZB6DZCXVzSNIRZBMVzPnUNRXDp02fYJdfHSY1Ne6iICnx1JrxSFBWasMcj12AIw11ZBGy6lZCRXTJcRkjYSgu4k4OmhQZCEzojjLWu2gx9ypZBjsQZBrIwgZBEZBAG4AHj44LQZAtFkgcdbwuF0aoX1W7A5GyZAZCyoY8nZAkEQtvJjuv1dtaqnoZD",
+              "Content-Type": "application/json"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "EmailTrigger": {
+      "main": [
+        [
+          {
+            "node": "ExtraerDatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ExtraerDatos": {
+      "main": [
+        [
+          {
+            "node": "CrearContactoGoogle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CrearContactoGoogle": {
+      "main": [
+        [
+          {
+            "node": "EnviarWhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
